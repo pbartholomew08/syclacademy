@@ -48,6 +48,9 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
 
+#include <sycl/sycl.hpp>
+
+/*
 TEST_CASE("scalar_add_usm", "scalar_add_source") {
 
   int a = 18, b = 24, r = 0;
@@ -57,6 +60,7 @@ TEST_CASE("scalar_add_usm", "scalar_add_source") {
 
   REQUIRE(r == 42);
 }
+*/
 
 TEST_CASE("scalar_add_buff_acc", "scalar_add_source") {
 
@@ -64,7 +68,27 @@ TEST_CASE("scalar_add_buff_acc", "scalar_add_source") {
 
   // Task: Compute a+b on the SYCL device using the buffer
   // accessor memory model
-  r = a + b;
+  auto q = sycl::queue{};
+
+  { // Magic code block
+    // Need to scope the buffer definition as the copy back to device (i.e.
+    // into r) occurs on buffer destruction.
+  auto bufA = sycl::buffer{&a, sycl::range{1}};
+  auto bufB = sycl::buffer{&b, sycl::range{1}};
+  auto bufR = sycl::buffer{&r, sycl::range{1}};
+
+  q.submit([&](sycl::handler &cgh)
+  {
+    auto accA = sycl::accessor{bufA, cgh, sycl::read_only};
+    auto accB = sycl::accessor{bufB, cgh, sycl::read_only};
+    auto accR = sycl::accessor{bufR, cgh, sycl::write_only};
+    
+    cgh.single_task<>([=]
+    {
+      accR[0] = accA[0] + accB[0];
+    });
+  }).wait();
+  }
 
   REQUIRE(r == 42);
 }

@@ -60,11 +60,48 @@
 TEST_CASE("nd_range_kernel", "nd_range_kernel_source") {
   constexpr size_t dataSize = 1024;
 
-  int a[dataSize], b[dataSize], r[dataSize];
-  for (int i = 0; i < dataSize; ++i) {
-    a[i] = i;
-    b[i] = i;
-    r[i] = 0;
+  // int a[dataSize], b[dataSize], r[dataSize];
+  // for (int i = 0; i < dataSize; ++i) {
+  //   a[i] = i;
+  //   b[i] = i;
+  //   r[i] = 0;
+  // }
+
+  auto q = sycl::queue{};
+
+  {
+    auto bufA = sycl::buffer{sycl::range{dataSize}};
+    auto bufB = sycl::buffer{sycl::range{dataSize}};
+    auto bufR = sycl::buffer{sycl::range{dataSize}};
+    
+    {
+      auto accA_h = sycl::accessor{bufA, sycl::no_init};
+      auto accB_h = sycl::accessor{bufB, sycl::no_init};
+      auto accR_h = sycl::accessor{bufR, sycl::no_init};
+  
+      for (int i = 0; i < dataSize; i++)
+      {
+        accA_h[i] = i;
+        accB_h[i] = i;
+        accR_h[i] = i;
+      }
+    }
+  
+    q.wait(); // Ensure data is initialised
+  
+    q.submit([&](sycl::handler &cgh)
+              {
+                auto accA = sycl::accessor{bufA, cgh, sycl::read_only};
+                auto accB = sycl::accessor{bufB, cgh, sycl::read_only};
+                auto accR = sycl::accessor{bufR, cgh, sycl::no_init};
+  
+                cgh.parallel_for<>(sycl::range{dataSize},
+                                   [=](sycl::id<1> i)
+                                   {
+                                     accR[i] = accA[i] + accB[i];
+                                   });
+              }).wait();
+  
   }
 
   // Task: parallelise the vector add kernel using nd_range

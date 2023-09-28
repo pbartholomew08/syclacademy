@@ -47,12 +47,51 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
 
+#include "sycl/sycl.hpp"
+
+/*
 TEST_CASE("synchronization_usm", "synchronization_source") {
   // Use your code from Exercise 3 to start
   REQUIRE(true);
 }
+*/
 
 TEST_CASE("synchronization_buffer_acc", "synchronization_source") {
   // Use your code from Exercise 3 to start
+
+  // Using exercise 6
+  constexpr size_t dataSize = 1024;
+
+  float a[dataSize], b[dataSize], r[dataSize];
+  for (int i = 0; i < dataSize; ++i) {
+    a[i] = static_cast<float>(i);
+    b[i] = static_cast<float>(i);
+    r[i] = 0.0f;
+  }
+
+  // Task: Compute r[i] = a[i] + b[i] in parallel on the SYCL device
+  auto q = sycl::queue{};
+
+  {
+    auto bufA = sycl::buffer{a, sycl::range{dataSize}};
+    auto bufB = sycl::buffer{b, sycl::range{dataSize}};
+    auto bufR = sycl::buffer{r, sycl::range{dataSize}};
+
+    q.submit([&](sycl::handler &cgh)
+             {
+               auto accA = sycl::accessor{bufA, cgh, sycl::read_only};
+               auto accB = sycl::accessor{bufB, cgh, sycl::read_only};
+               auto accR = sycl::accessor{bufR, cgh, sycl::no_init};
+
+               cgh.parallel_for<>(sycl::range{dataSize},
+                                  [=](sycl::id<1> i)
+                                  {
+                                    accR[i] = accA[i] + accB[i];
+                                  });
+             });
+
+    q.wait();
+  }
+
   REQUIRE(true);
 }

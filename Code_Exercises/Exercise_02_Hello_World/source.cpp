@@ -37,12 +37,28 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
 
+#include <sycl/sycl.hpp>
+
 TEST_CASE("hello_world", "hello_world_source") {
 
   // Print "Hello World!\n"
   std::cout << "Hello World!\n";
 
   // Task: Have this message print from the SYCL device instead of the host
+  auto q = sycl::queue{};
+  q.submit(
+    [&](sycl::handler &cgh)
+    {
+      auto os = sycl::stream{16, 16, cgh}; // Can use same work and buffer size as only doing a single task
+
+      cgh.single_task<>([=]
+      {
+        os << "Hello world!\n";
+      });
+    }
+  ).wait();
+
+  std::cout << "The kernel has run" << std::endl;
 
   REQUIRE(true);
 }
